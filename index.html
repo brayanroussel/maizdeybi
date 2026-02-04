@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Control de Granos - Maíz y Frijoles</title>
+    
+    <!-- Etiquetas PWA -->
+    <meta name="theme-color" content="#2e7d32">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/1147/1147832.png">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #2e7d32;
+            --secondary: #f9a825;
+        }
+        body {
+            background-color: #f4f7f6;
+            font-family: system-ui, -apple-system, sans-serif;
+            touch-action: manipulation;
+        }
+        .btn-large {
+            padding: 1.5rem;
+            font-size: 1.25rem;
+            font-weight: bold;
+            border-radius: 1rem;
+            transition: transform 0.1s;
+        }
+        .btn-large:active {
+            transform: scale(0.95);
+        }
+        .card {
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body class="pb-24">
+
+    <!-- Encabezado y Navegación de Fiados -->
+    <header class="bg-green-700 text-white p-4 sticky top-0 z-50 shadow-md">
+        <div class="flex justify-between items-center max-w-lg mx-auto">
+            <h1 class="text-xl font-bold">🌾 Control de Granos</h1>
+            <button onclick="showSection('fiados')" class="bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded-full font-bold text-sm">
+                FIADOS
+            </button>
+        </div>
+    </header>
+
+    <main class="max-w-lg mx-auto p-4">
+
+        <!-- SECCIÓN: VENTAS (Principal) -->
+        <section id="ventas" class="tab-content active">
+            <h2 class="text-2xl font-bold mb-4 text-green-900">Nueva Venta</h2>
+            
+            <div class="card">
+                <label class="block mb-2 font-bold text-gray-700">1. ¿Qué va a vender?</label>
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <button id="btn-sel-maiz" onclick="selectProduct('maiz')" class="p-4 border-4 border-green-600 bg-green-50 rounded-xl text-center">
+                        <span class="block text-3xl">🌽</span>
+                        <span class="font-bold">Maíz</span>
+                    </button>
+                    <button id="btn-sel-frijol" onclick="selectProduct('frijol')" class="p-4 border-2 border-gray-200 rounded-xl text-center">
+                        <span class="block text-3xl">🫘</span>
+                        <span class="font-bold">Frijoles</span>
+                    </button>
+                </div>
+
+                <label class="block mb-2 font-bold text-gray-700">2. Cantidad (Libras)</label>
+                <div class="flex items-center gap-2 mb-4">
+                    <input type="number" id="venta-cantidad" step="0.5" value="1" oninput="updateLiveTotal()" class="w-full p-4 text-2xl border rounded-lg text-center" placeholder="0.0">
+                    <button onclick="adjustQty(0.5)" class="bg-gray-200 p-4 rounded-lg font-bold text-xl">+</button>
+                    <button onclick="adjustQty(-0.5)" class="bg-gray-200 p-4 rounded-lg font-bold text-xl">-</button>
+                </div>
+
+                <label class="block mb-2 font-bold text-gray-700">3. Precio por Libra (LPS)</label>
+                <div id="price-options" class="grid grid-cols-3 gap-2 mb-4">
+                    <!-- Opciones de precio dinámicas -->
+                </div>
+
+                <div id="cal-option" class="hidden mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" id="add-cal" onchange="updateLiveTotal()" class="w-6 h-6 text-blue-600">
+                        <span class="font-bold text-blue-800">¿Agregar Cal? (+3 LPS)</span>
+                    </label>
+                </div>
+
+                <!-- Visualización Dinámica del Total -->
+                <div class="bg-gray-100 p-4 rounded-lg mb-4 text-center">
+                    <p class="text-gray-600 uppercase text-xs font-bold">Total a Cobrar</p>
+                    <p id="live-total" class="text-4xl font-black text-green-700">L 7.50</p>
+                </div>
+
+                <button onclick="registrarVenta()" class="w-full bg-green-600 text-white btn-large shadow-lg">
+                    COBRAR VENTA
+                </button>
+            </div>
+            
+            <div class="card">
+                <h3 class="font-bold mb-2">Inventario Disponible</h3>
+                <div class="flex justify-between text-lg">
+                    <span>Maíz: <b id="inv-maiz-total">0</b> lbs</span>
+                    <span>Frijoles: <b id="inv-frijol-total">0</b> lbs</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN: INVENTARIO -->
+        <section id="inventario" class="tab-content">
+            <h2 class="text-2xl font-bold mb-4">Bodega (Sacos)</h2>
+            
+            <div class="card bg-green-50 border border-green-200">
+                <h3 class="font-bold mb-2">Registrar Nuevo Saco</h3>
+                <div class="grid grid-cols-2 gap-2 mb-4">
+                    <select id="inv-tipo" class="p-3 border rounded-lg font-bold">
+                        <option value="maiz">Maíz</option>
+                        <option value="frijol">Frijoles</option>
+                    </select>
+                    <input type="number" id="inv-libras" value="100" class="p-3 border rounded-lg" placeholder="Libras">
+                </div>
+                <input type="number" id="inv-precio" class="w-full p-3 border rounded-lg mb-4" placeholder="Precio de costo total (LPS)">
+                <button onclick="agregarSaco()" class="w-full bg-green-700 text-white p-3 rounded-lg font-bold">
+                    GUARDAR EN INVENTARIO
+                </button>
+            </div>
+
+            <h3 class="font-bold text-gray-600 mb-2">Sacos de Maíz</h3>
+            <div id="lista-maiz" class="mb-4"></div>
+
+            <h3 class="font-bold text-gray-600 mb-2">Sacos de Frijoles</h3>
+            <div id="lista-frijol"></div>
+        </section>
+
+        <!-- SECCIÓN: ESTADÍSTICAS -->
+        <section id="estadisticas" class="tab-content">
+            <h2 class="text-2xl font-bold mb-4 text-blue-900">Estadísticas Semanales</h2>
+            
+            <div class="card bg-white border border-blue-100">
+                <h3 class="font-bold text-gray-700 mb-4" id="semana-actual-label">Esta Semana</h3>
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="bg-green-50 p-3 rounded-lg">
+                        <span class="text-xs text-green-700 font-bold uppercase">Maíz</span>
+                        <p class="text-xl font-bold" id="stats-maiz">0 lbs</p>
+                    </div>
+                    <div class="bg-red-50 p-3 rounded-lg">
+                        <span class="text-xs text-red-700 font-bold uppercase">Frijoles</span>
+                        <p class="text-xl font-bold" id="stats-frijol">0 lbs</p>
+                    </div>
+                    <div class="bg-blue-50 p-3 rounded-lg">
+                        <span class="text-xs text-blue-700 font-bold uppercase">Cal</span>
+                        <p class="text-xl font-bold" id="stats-cal">L 0</p>
+                    </div>
+                    <div class="bg-yellow-50 p-3 rounded-lg">
+                        <span class="text-xs text-yellow-700 font-bold uppercase">Ganancia</span>
+                        <p class="text-xl font-bold" id="stats-ganancia">L 0</p>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <p class="text-sm font-bold text-gray-600 mb-2">Ventas por Día (Lbs)</p>
+                    <div class="h-48">
+                        <canvas id="weeklyChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="p-4 bg-gray-50 rounded-xl border flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-bold text-gray-500 uppercase">Top Producto</p>
+                        <p class="text-lg font-bold" id="stats-top">-</p>
+                    </div>
+                    <span class="text-3xl" id="stats-top-icon">⭐</span>
+                </div>
+            </div>
+
+            <h3 class="font-bold text-gray-700 mb-2">Semanas Pasadas</h3>
+            <div id="lista-semanas" class="space-y-2"></div>
+        </section>
+
+        <!-- SECCIÓN: FIADOS -->
+        <section id="fiados" class="tab-content">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold">Fiados a Proveedores</h2>
+                <button onclick="showSection('ventas')" class="text-green-700 font-bold">Volver</button>
+            </div>
+
+            <div class="card bg-yellow-50 border border-yellow-200">
+                <h3 class="font-bold mb-2">Nuevo Fiado</h3>
+                <select id="fia-tipo" class="w-full p-3 border rounded-lg mb-2">
+                    <option value="maiz">Maíz</option>
+                    <option value="frijol">Frijoles</option>
+                </select>
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <input type="number" id="fia-cantidad" placeholder="Cant. Sacos" class="p-3 border rounded-lg">
+                    <input type="number" id="fia-precio" placeholder="Precio Total" class="p-3 border rounded-lg">
+                </div>
+                <input type="number" id="fia-deuda" placeholder="¿Cuánto se debe?" class="w-full p-3 border rounded-lg mb-2">
+                <button onclick="agregarFiado()" class="w-full bg-yellow-600 text-white p-3 rounded-lg font-bold">REGISTRAR DEUDA</button>
+            </div>
+
+            <div id="lista-fiados"></div>
+        </section>
+
+        <!-- SECCIÓN: INFORMES (Cierre Diario) -->
+        <section id="informes" class="tab-content">
+            <h2 class="text-2xl font-bold mb-4">Informes y Cierre</h2>
+            
+            <div class="card bg-blue-900 text-white">
+                <h3 class="text-sm uppercase opacity-80">Venta de Hoy</h3>
+                <p class="text-4xl font-bold" id="resumen-hoy-dinero">L 0.00</p>
+                <hr class="my-3 opacity-20">
+                <button onclick="cerrarJornadaManual()" class="w-full bg-red-500 text-white p-3 rounded-lg font-bold">CERRAR DÍA Y VER REPORTE</button>
+            </div>
+
+            <h3 class="font-bold text-gray-700 mb-2 text-lg">Historial Jornadas (15 d)</h3>
+            <div id="lista-informes"></div>
+        </section>
+
+    </main>
+
+    <!-- Navegación Inferior -->
+    <nav class="fixed bottom-0 w-full bg-white border-t flex justify-around p-2 shadow-2xl z-50">
+        <button onclick="showSection('ventas')" class="flex flex-col items-center text-green-700">
+            <span class="text-2xl">💰</span>
+            <span class="text-xs font-bold">Ventas</span>
+        </button>
+        <button onclick="showSection('inventario')" class="flex flex-col items-center text-gray-500">
+            <span class="text-2xl">📦</span>
+            <span class="text-xs font-bold">Bodega</span>
+        </button>
+        <button onclick="showSection('estadisticas')" class="flex flex-col items-center text-gray-500">
+            <span class="text-2xl">📈</span>
+            <span class="text-xs font-bold">Estats</span>
+        </button>
+        <button onclick="showSection('informes')" class="flex flex-col items-center text-gray-500">
+            <span class="text-2xl">📊</span>
+            <span class="text-xs font-bold">Informe</span>
+        </button>
+    </nav>
+
+    <!-- Modal de Informe de Cierre -->
+    <div id="modal-informe" class="fixed inset-0 bg-black bg-opacity-50 hidden z-[100] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-sm p-6 overflow-y-auto max-h-[80vh]">
+            <h2 class="text-xl font-bold text-center mb-4">Reporte de Cierre</h2>
+            <div id="informe-detalle" class="space-y-3 text-lg">
+                <!-- Detalle inyectado -->
+            </div>
+            <button onclick="cerrarModalInforme()" class="mt-6 w-full bg-green-700 text-white p-4 rounded-xl font-bold">ENTENDIDO</button>
+        </div>
+    </div>
+
+    <script>
+        // --- REGISTRO DE SERVICE WORKER PARA PWA ---
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('SW registrado', reg))
+                    .catch(err => console.log('Error registro SW', err));
+            });
+        }
+
+        // --- CONFIGURACIÓN DE BASE DE DATOS (IndexedDB) ---
+        let db;
+        const request = indexedDB.open("NegocioGranosDB", 2); 
+
+        request.onupgradeneeded = (e) => {
+            db = e.target.result;
+            if (!db.objectStoreNames.contains("inventario")) db.createObjectStore("inventario", { keyPath: "id", autoIncrement: true });
+            if (!db.objectStoreNames.contains("ventas")) db.createObjectStore("ventas", { keyPath: "id", autoIncrement: true });
+            if (!db.objectStoreNames.contains("fiados")) db.createObjectStore("fiados", { keyPath: "id", autoIncrement: true });
+            if (!db.objectStoreNames.contains("jornadas")) db.createObjectStore("jornadas", { keyPath: "id", autoIncrement: true });
+            if (!db.objectStoreNames.contains("semanas")) db.createObjectStore("semanas", { keyPath: "id", autoIncrement: true });
+            if (!db.objectStoreNames.contains("ventas_historial")) db.createObjectStore("ventas_historial", { keyPath: "id", autoIncrement: true });
+        };
+
+        request.onsuccess = (e) => {
+            db = e.target.result;
+            verificarCierreAutomatico();
+            actualizarTodo();
+        };
+
+        // --- ESTADO Y UI ---
+        let selectedProduct = 'maiz';
+        const preciosDefault = {
+            maiz: [6.5, 7, 7.5, 8, 8.5],
+            frijol: [21, 22, 23, 24]
+        };
+        let selectedPrice = 7.5;
+        let weeklyChartInstance = null;
+
+        function showSection(id) {
+            document.querySelectorAll('.tab-content').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            document.querySelectorAll('nav button').forEach(btn => btn.classList.replace('text-green-700', 'text-gray-500'));
+            const activeBtn = Array.from(document.querySelectorAll('nav button')).find(b => b.innerText.toLowerCase().includes(id.substring(0,3)));
+            if(activeBtn) activeBtn.classList.replace('text-gray-500', 'text-green-700');
+
+            if(id === 'estadisticas') renderWeeklyStats();
+        }
+
+        function selectProduct(type) {
+            selectedProduct = type;
+            document.getElementById('btn-sel-maiz').className = type === 'maiz' ? 'p-4 border-4 border-green-600 bg-green-50 rounded-xl text-center' : 'p-4 border-2 border-gray-200 rounded-xl text-center';
+            document.getElementById('btn-sel-frijol').className = type === 'frijol' ? 'p-4 border-4 border-green-600 bg-green-50 rounded-xl text-center' : 'p-4 border-2 border-gray-200 rounded-xl text-center';
+            
+            document.getElementById('cal-option').classList.toggle('hidden', type !== 'maiz');
+            renderPriceOptions();
+            updateLiveTotal();
+        }
+
+        function renderPriceOptions() {
+            const container = document.getElementById('price-options');
+            container.innerHTML = '';
+            const defaultPrice = selectedProduct === 'maiz' ? 7.5 : 23;
+            
+            if (!preciosDefault[selectedProduct].includes(selectedPrice)) {
+                selectedPrice = defaultPrice;
+            }
+
+            preciosDefault[selectedProduct].forEach(p => {
+                const btn = document.createElement('button');
+                btn.className = `p-3 border-2 rounded-lg font-bold ${p === selectedPrice ? 'bg-green-600 text-white border-green-600' : 'bg-white border-gray-200'}`;
+                btn.innerText = `L ${p}`;
+                btn.onclick = () => {
+                    selectedPrice = p;
+                    renderPriceOptions();
+                    updateLiveTotal();
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        function adjustQty(val) {
+            const input = document.getElementById('venta-cantidad');
+            let current = parseFloat(input.value) || 0;
+            input.value = Math.max(0.5, current + val);
+            updateLiveTotal();
+        }
+
+        function updateLiveTotal() {
+            const cant = parseFloat(document.getElementById('venta-cantidad').value) || 0;
+            const conCal = document.getElementById('add-cal').checked;
+            const calPrecio = (selectedProduct === 'maiz' && conCal) ? 3 : 0;
+            const total = (cant * selectedPrice) + calPrecio;
+            document.getElementById('live-total').innerText = `L ${total.toFixed(2)}`;
+        }
+
+        // --- MANEJO DE DATOS ---
+
+        async function agregarSaco() {
+            const tipo = document.getElementById('inv-tipo').value;
+            const libras = parseFloat(document.getElementById('inv-libras').value);
+            const precio = parseFloat(document.getElementById('inv-precio').value);
+
+            if(!libras || !precio) return;
+
+            const costoLibra = precio / libras;
+            const saco = { 
+                tipo, 
+                libras, 
+                costoLibra, 
+                precioUnitarioSaco: precio, 
+                librasRestantes: libras, 
+                fecha: new Date() 
+            };
+
+            const tx = db.transaction("inventario", "readwrite");
+            tx.objectStore("inventario").add(saco);
+            tx.oncomplete = () => {
+                actualizarTodo();
+                document.getElementById('inv-precio').value = '';
+                alert("Saco guardado.");
+            };
+        }
+
+        async function registrarVenta() {
+            const cant = parseFloat(document.getElementById('venta-cantidad').value);
+            const conCal = document.getElementById('add-cal').checked;
+            
+            if (!cant || cant <= 0) return;
+
+            const inventario = await getAll("inventario");
+            const sacosDisponibles = inventario.filter(s => s.tipo === selectedProduct && s.librasRestantes > 0);
+            const totalLibre = sacosDisponibles.reduce((acc, s) => acc + s.librasRestantes, 0);
+
+            if(totalLibre < cant) return alert("No hay suficiente en inventario.");
+
+            let restantePorVender = cant;
+            let costoTotalVenta = 0;
+            const tx = db.transaction(["inventario", "ventas", "ventas_historial"], "readwrite");
+            const invStore = tx.objectStore("inventario");
+            const vtaStore = tx.objectStore("ventas");
+            const histStore = tx.objectStore("ventas_historial");
+
+            for(let saco of sacosDisponibles) {
+                if(restantePorVender <= 0) break;
+                
+                let cantDeEsteSaco = 0;
+                if(saco.librasRestantes >= restantePorVender) {
+                    cantDeEsteSaco = restantePorVender;
+                    saco.librasRestantes -= restantePorVender;
+                    restantePorVender = 0;
+                } else {
+                    cantDeEsteSaco = saco.librasRestantes;
+                    restantePorVender -= saco.librasRestantes;
+                    saco.librasRestantes = 0;
+                }
+                costoTotalVenta += (cantDeEsteSaco * saco.costoLibra);
+                invStore.put(saco);
+            }
+
+            const subtotal = cant * selectedPrice;
+            const calPrecio = (selectedProduct === 'maiz' && conCal) ? 3 : 0;
+            const total = subtotal + calPrecio;
+            const ganancia = total - costoTotalVenta;
+
+            const venta = {
+                producto: selectedProduct,
+                cantidad: cant,
+                precioLibra: selectedPrice,
+                cal: calPrecio,
+                total: total,
+                ganancia: ganancia,
+                fecha: new Date()
+            };
+
+            vtaStore.add(venta);
+            histStore.add(venta);
+            tx.oncomplete = () => {
+                document.getElementById('venta-cantidad').value = 1;
+                document.getElementById('add-cal').checked = false;
+                updateLiveTotal();
+                actualizarTodo();
+                alert("Venta registrada.");
+            };
+        }
+
+        async function agregarFiado() {
+            const fiado = {
+                tipo: document.getElementById('fia-tipo').value,
+                cantidadSacos: document.getElementById('fia-cantidad').value,
+                precioTotal: document.getElementById('fia-precio').value,
+                deuda: parseFloat(document.getElementById('fia-deuda').value),
+                pagado: false,
+                fecha: new Date()
+            };
+            if(!fiado.deuda) return;
+            const tx = db.transaction("fiados", "readwrite");
+            tx.objectStore("fiados").add(fiado);
+            tx.oncomplete = () => {
+                actualizarTodo();
+                document.getElementById('fia-deuda').value = '';
+                alert("Deuda registrada.");
+            };
+        }
+
+        async function pagarFiado(id) {
+            const tx = db.transaction("fiados", "readwrite");
+            const store = tx.objectStore("fiados");
+            const f = await new Promise(res => { store.get(id).onsuccess = e => res(e.target.result); });
+            f.pagado = true;
+            store.put(f);
+            tx.oncomplete = () => actualizarTodo();
+        }
+
+        // --- ESTADÍSTICAS SEMANALES ---
+
+        function getStartOfWeek(date) {
+            const d = new Date(date);
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Lunes
+            return new Date(d.setDate(diff)).setHours(0,0,0,0);
+        }
+
+        function getEndOfWeek(date) {
+            const start = new Date(getStartOfWeek(date));
+            return new Date(start.setDate(start.getDate() + 6)).setHours(23,59,59,999);
+        }
+
+        async function renderWeeklyStats() {
+            const ahora = new Date();
+            const inicio = getStartOfWeek(ahora);
+            const fin = getEndOfWeek(ahora);
+
+            document.getElementById('semana-actual-label').innerText = `Semana: ${new Date(inicio).toLocaleDateString()} - ${new Date(fin).toLocaleDateString()}`;
+
+            const ventasHist = await getAll("ventas_historial");
+            const ventasSemana = ventasHist.filter(v => {
+                const f = new Date(v.fecha).getTime();
+                return f >= inicio && f <= fin;
+            });
+
+            let mTotal = 0, fTotal = 0, calTotal = 0, ganTotal = 0;
+            const chartData = { maiz: [0,0,0,0,0,0,0], frijol: [0,0,0,0,0,0,0] };
+
+            ventasSemana.forEach(v => {
+                const f = new Date(v.fecha);
+                let dayIdx = f.getDay() - 1; 
+                if(dayIdx === -1) dayIdx = 6; // Domingo
+
+                if(v.producto === 'maiz') {
+                    mTotal += v.cantidad;
+                    chartData.maiz[dayIdx] += v.cantidad;
+                } else {
+                    fTotal += v.cantidad;
+                    chartData.frijol[dayIdx] += v.cantidad;
+                }
+                calTotal += v.cal;
+                ganTotal += v.ganancia;
+            });
+
+            document.getElementById('stats-maiz').innerText = `${mTotal.toFixed(1)} lbs`;
+            document.getElementById('stats-frijol').innerText = `${fTotal.toFixed(1)} lbs`;
+            document.getElementById('stats-cal').innerText = `L ${calTotal.toFixed(2)}`;
+            document.getElementById('stats-ganancia').innerText = `L ${ganTotal.toFixed(2)}`;
+            
+            const topProd = mTotal >= fTotal ? 'Maíz' : 'Frijoles';
+            document.getElementById('stats-top').innerText = topProd;
+            document.getElementById('stats-top-icon').innerText = mTotal >= fTotal ? '🌽' : '🫘';
+
+            updateChart(chartData);
+            renderPastWeeks(inicio);
+        }
+
+        function updateChart(data) {
+            const ctx = document.getElementById('weeklyChart').getContext('2d');
+            if(weeklyChartInstance) weeklyChartInstance.destroy();
+            
+            weeklyChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'],
+                    datasets: [
+                        { label: 'Maíz', data: data.maiz, backgroundColor: '#2e7d32' },
+                        { label: 'Frijol', data: data.frijol, backgroundColor: '#d32f2f' }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        async function renderPastWeeks(currentWeekStart) {
+            const semanas = await getAll("semanas");
+            const container = document.getElementById('lista-semanas');
+            container.innerHTML = '';
+            
+            semanas.reverse().slice(0, 4).forEach(s => {
+                const div = document.createElement('div');
+                div.className = "card text-xs";
+                div.innerHTML = `
+                    <div class="font-bold border-b pb-1 mb-1">Del ${new Date(s.semanaInicio).toLocaleDateString()} al ${new Date(s.semanaFin).toLocaleDateString()}</div>
+                    <div class="grid grid-cols-2 gap-1">
+                        <span>🌽 ${s.maizTotal.toFixed(1)} lbs</span>
+                        <span>🫘 ${s.frijolTotal.toFixed(1)} lbs</span>
+                        <span>Cal: L ${s.calTotal}</span>
+                        <span class="text-blue-700 font-bold">Ganancia: L ${s.gananciaTotal.toFixed(2)}</span>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // --- CIERRE AUTOMÁTICO Y SEMANAL ---
+
+        async function verificarCierreAutomatico() {
+            const ahora = new Date();
+            const horaHn = new Date(ahora.toLocaleString("en-US", {timeZone: "America/Tegucigalpa"}));
+            const hoyStr = horaHn.toDateString();
+            const ultimoCierre = localStorage.getItem('fechaCierreGrains');
+
+            if (ultimoCierre && ultimoCierre !== hoyStr) {
+                const ventasActuales = await getAll("ventas");
+                if(ventasActuales.length > 0) await ejecutarCierre();
+            }
+            localStorage.setItem('fechaCierreGrains', hoyStr);
+
+            const ultimaSemanaCierre = localStorage.getItem('semanaCierreGrains');
+            const inicioActual = getStartOfWeek(horaHn).toString();
+            
+            if(ultimaSemanaCierre && ultimaSemanaCierre !== inicioActual) {
+                await ejecutarCierreSemanal(new Date(parseInt(ultimaSemanaCierre)));
+            }
+            localStorage.setItem('semanaCierreGrains', inicioActual);
+        }
+
+        async function ejecutarCierreSemanal(fechaInicio) {
+            const inicio = fechaInicio.getTime();
+            const fin = getEndOfWeek(fechaInicio);
+            
+            const hist = await getAll("ventas_historial");
+            const vSemana = hist.filter(v => {
+                const t = new Date(v.fecha).getTime();
+                return t >= inicio && t <= fin;
+            });
+
+            if(vSemana.length === 0) return;
+
+            let mTotal = 0, fTotal = 0, calTotal = 0, ganTotal = 0;
+            vSemana.forEach(v => {
+                if(v.producto === 'maiz') mTotal += v.cantidad;
+                else fTotal += v.cantidad;
+                calTotal += v.cal;
+                ganTotal += v.ganancia;
+            });
+
+            const registro = {
+                semanaInicio: new Date(inicio),
+                semanaFin: new Date(fin),
+                maizTotal: mTotal,
+                frijolTotal: fTotal,
+                calTotal: calTotal,
+                gananciaTotal: ganTotal,
+                productoTop: mTotal >= fTotal ? 'Maíz' : 'Frijoles'
+            };
+
+            const tx = db.transaction("semanas", "readwrite");
+            tx.objectStore("semanas").add(registro);
+            tx.oncomplete = () => console.log("Cierre semanal guardado.");
+        }
+
+        async function cerrarJornadaManual() {
+            const ventas = await getAll("ventas");
+            if(ventas.length === 0) return alert("No hay ventas hoy.");
+            if(confirm("¿Cerrar el día y generar reporte?")) {
+                await ejecutarCierre();
+            }
+        }
+
+        // FUNCIÓN CORREGIDA: ejecutarCierre
+        async function ejecutarCierre() {
+            try {
+                // 1. Obtener todas las ventas del día para calcular totales
+                const ventas = await getAll("ventas");
+                
+                if (ventas.length === 0) return;
+
+                let mLib = 0, fLib = 0, calTotal = 0, recaudado = 0, gananciaTotal = 0;
+                
+                ventas.forEach(v => {
+                    if (v.producto === 'maiz') mLib += v.cantidad;
+                    if (v.producto === 'frijol') fLib += v.cantidad;
+                    calTotal += (v.cal || 0);
+                    recaudado += (v.total || 0);
+                    gananciaTotal += (v.ganancia || 0);
+                });
+
+                const jornada = {
+                    fecha: new Date(),
+                    maiz: mLib,
+                    frijol: fLib,
+                    cal: calTotal,
+                    total: recaudado,
+                    ganancia: gananciaTotal
+                };
+
+                // 2. Guardar jornada y limpiar ventas en una sola transacción segura
+                await new Promise((resolve, reject) => {
+                    const tx = db.transaction(["jornadas", "ventas"], "readwrite");
+                    const jornadasStore = tx.objectStore("jornadas");
+                    const ventasStore = tx.objectStore("ventas");
+
+                    jornadasStore.add(jornada);
+                    ventasStore.clear();
+
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = (err) => reject(err);
+                });
+
+                // 3. Mantener solo las últimas 15 jornadas (Transacción separada para evitar conflictos)
+                const todasLasJornadas = await getAll("jornadas");
+                if (todasLasJornadas.length > 15) {
+                    const jornadasABorrar = todasLasJornadas
+                        .sort((a, b) => a.id - b.id) 
+                        .slice(0, todasLasJornadas.length - 15);
+
+                    await new Promise((resolve) => {
+                        const deleteTx = db.transaction("jornadas", "readwrite");
+                        const store = deleteTx.objectStore("jornadas");
+                        jornadasABorrar.forEach(j => store.delete(j.id));
+                        deleteTx.oncomplete = () => resolve();
+                    });
+                }
+
+                // 4. Mostrar el reporte y actualizar la UI
+                mostrarReporteModal(jornada);
+                actualizarTodo();
+
+            } catch (error) {
+                console.error("Error en el cierre de jornada:", error);
+                alert("Ocurrió un error al procesar el cierre.");
+            }
+        }
+
+        function mostrarReporteModal(j) {
+            const html = `
+                <div class="flex justify-between border-b pb-2"><span>Maíz:</span> <b>${j.maiz.toFixed(1)} lbs</b></div>
+                <div class="flex justify-between border-b pb-2"><span>Frijol:</span> <b>${j.frijol.toFixed(1)} lbs</b></div>
+                <div class="flex justify-between border-b pb-2"><span>Cal:</span> <b>L ${j.cal.toFixed(2)}</b></div>
+                <div class="flex justify-between border-b pb-2 text-green-700 font-bold"><span>Total Cobrado:</span> <span>L ${j.total.toFixed(2)}</span></div>
+                <div class="flex justify-between text-blue-700 font-bold"><span>Ganancia:</span> <span>L ${j.ganancia.toFixed(2)}</span></div>
+            `;
+            document.getElementById('informe-detalle').innerHTML = html;
+            document.getElementById('modal-informe').classList.remove('hidden');
+        }
+
+        function cerrarModalInforme() {
+            document.getElementById('modal-informe').classList.add('hidden');
+        }
+
+        // --- RENDERIZADO GENERAL ---
+
+        function getAll(storeName) {
+            return new Promise((res) => {
+                if(!db) return res([]);
+                const tx = db.transaction(storeName, "readonly");
+                tx.objectStore(storeName).getAll().onsuccess = e => res(e.target.result);
+            });
+        }
+
+        async function actualizarTodo() {
+            const inv = await getAll("inventario");
+            const mTot = inv.filter(s => s.tipo === 'maiz').reduce((a, s) => a + s.librasRestantes, 0);
+            const fTot = inv.filter(s => s.tipo === 'frijol').reduce((a, s) => a + s.librasRestantes, 0);
+            document.getElementById('inv-maiz-total').innerText = mTot.toFixed(1);
+            document.getElementById('inv-frijol-total').innerText = fTot.toFixed(1);
+
+            const lMaiz = document.getElementById('lista-maiz');
+            const lFrijol = document.getElementById('lista-frijol');
+            lMaiz.innerHTML = ''; lFrijol.innerHTML = '';
+            inv.forEach(s => {
+                if (s.librasRestantes <= 0) return;
+                const div = document.createElement('div');
+                div.className = "flex justify-between p-2 border-b text-sm bg-white rounded-lg mb-1";
+                div.innerHTML = `<span>Saco ${s.libras} lbs</span> <b>${s.librasRestantes.toFixed(1)} rest.</b>`;
+                if(s.tipo === 'maiz') lMaiz.appendChild(div); else lFrijol.appendChild(div);
+            });
+
+            const fiados = await getAll("fiados");
+            const fCont = document.getElementById('lista-fiados');
+            fCont.innerHTML = '';
+            fiados.reverse().forEach(f => {
+                const card = document.createElement('div');
+                card.className = `card ${f.pagado ? 'opacity-50' : 'border-l-4 border-yellow-500'}`;
+                card.innerHTML = `
+                    <div class="flex justify-between">
+                        <b>${f.tipo === 'maiz' ? '🌽 Maíz' : '🫘 Frijol'}</b>
+                        <span class="${f.pagado ? 'text-green-600' : 'text-red-600'} font-bold">${f.pagado ? 'PAGADO' : 'PENDIENTE'}</span>
+                    </div>
+                    <p class="text-sm">Sacos: ${f.cantidadSacos} | Deuda: L ${f.deuda}</p>
+                    ${!f.pagado ? `<button onclick="pagarFiado(${f.id})" class="mt-2 w-full py-2 bg-yellow-100 rounded font-bold">MARCAR PAGADO</button>` : ''}
+                `;
+                fCont.appendChild(card);
+            });
+
+            const ventas = await getAll("ventas");
+            const totalHoy = ventas.reduce((a, v) => a + v.total, 0);
+            document.getElementById('resumen-hoy-dinero').innerText = `L ${totalHoy.toFixed(2)}`;
+
+            const jornadas = await getAll("jornadas");
+            const jCont = document.getElementById('lista-informes');
+            jCont.innerHTML = '';
+            jornadas.reverse().forEach(j => {
+                const div = document.createElement('div');
+                div.className = "card text-sm";
+                div.innerHTML = `
+                    <div class="flex justify-between font-bold border-b pb-1 mb-2">
+                        <span>${new Date(j.fecha).toLocaleDateString()}</span>
+                        <span class="text-green-700 font-black">L ${j.total.toFixed(2)}</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-1 text-gray-600">
+                        <div>🌽 ${j.maiz.toFixed(1)} lbs</div>
+                        <div>🫘 ${j.frijol.toFixed(1)} lbs</div>
+                        <div>Cal: L ${j.cal.toFixed(2)}</div>
+                        <div class="text-blue-700">Gan: L ${j.ganancia.toFixed(2)}</div>
+                    </div>
+                `;
+                jCont.appendChild(div);
+            });
+        }
+
+        // Inicializar
+        selectProduct('maiz');
+    </script>
+</body>
+</html>
