@@ -530,7 +530,7 @@
             
             const topProd = mTotal >= fTotal ? 'Maíz' : 'Frijoles';
             document.getElementById('stats-top').innerText = topProd;
-            document.getElementById('stats-top-icon').innerText = mTotal >= fTotal ? '🌽' : '🫘';
+            document.getElementById('stats-top-icon').innerText = mTotal >= fTotal ? '🌽' : '🥫';
 
             updateChart(chartData);
             renderPastWeeks(inicio);
@@ -569,7 +569,7 @@
                     <div class="font-bold border-b pb-1 mb-1">Del ${new Date(s.semanaInicio).toLocaleDateString()} al ${new Date(s.semanaFin).toLocaleDateString()}</div>
                     <div class="grid grid-cols-2 gap-1">
                         <span>🌽 ${s.maizTotal.toFixed(1)} lbs</span>
-                        <span>🫘 ${s.frijolTotal.toFixed(1)} lbs</span>
+                        <span>🥫 ${s.frijolTotal.toFixed(1)} lbs</span>
                         <span>Cal: L ${s.calTotal}</span>
                         <span class="text-blue-700 font-bold">Ganancia: L ${s.gananciaTotal.toFixed(2)}</span>
                     </div>
@@ -802,3 +802,4 @@
 </body>
 
 </html>
+
