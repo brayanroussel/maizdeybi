@@ -47,6 +47,13 @@
         .tab-content.active {
             display: block;
         }
+        .modal {
+            animation: modalFadeIn 0.3s ease-out;
+        }
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body class="pb-24">
@@ -103,6 +110,24 @@
                 <div class="bg-gray-100 p-4 rounded-lg mb-4 text-center">
                     <p class="text-gray-600 uppercase text-xs font-bold">Total a Cobrar</p>
                     <p id="live-total" class="text-4xl font-black text-green-700">L 7.50</p>
+                </div>
+
+                <!-- NUEVO: Pago del Cliente -->
+                <div class="mb-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <label class="block mb-2 font-bold text-yellow-800">Pago del Cliente (LPS)</label>
+                    <div class="grid grid-cols-2 gap-2 mb-2">
+                        <button onclick="quickPago(5)" class="bg-white border border-yellow-300 p-3 rounded-lg font-bold hover:bg-yellow-100">L 5</button>
+                        <button onclick="quickPago(10)" class="bg-white border border-yellow-300 p-3 rounded-lg font-bold hover:bg-yellow-100">L 10</button>
+                        <button onclick="quickPago(20)" class="bg-white border border-yellow-300 p-3 rounded-lg font-bold hover:bg-yellow-100">L 20</button>
+                        <button onclick="quickPago(50)" class="bg-white border border-yellow-300 p-3 rounded-lg font-bold hover:bg-yellow-100">L 50</button>
+                    </div>
+                    <input type="number" id="pago-cliente" step="0.5" value="0" oninput="calcularVuelto()" class="w-full p-4 text-2xl border border-yellow-300 rounded-lg text-center" placeholder="0.00">
+                    
+                    <!-- Mostrar Vuelto -->
+                    <div id="vuelto-container" class="mt-3 hidden">
+                        <p class="text-sm font-bold text-green-700 mb-1">VUELTO A ENTREGAR:</p>
+                        <p id="vuelto-monto" class="text-3xl font-black text-green-700">L 0.00</p>
+                    </div>
                 </div>
 
                 <button onclick="registrarVenta()" class="w-full bg-green-600 text-white btn-large shadow-lg">
@@ -253,12 +278,29 @@
 
     <!-- Modal de Informe de Cierre -->
     <div id="modal-informe" class="fixed inset-0 bg-black bg-opacity-50 hidden z-[100] flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl w-full max-w-sm p-6 overflow-y-auto max-h-[80vh]">
+        <div class="bg-white rounded-2xl w-full max-w-sm p-6 overflow-y-auto max-h-[80vh] modal">
             <h2 class="text-xl font-bold text-center mb-4">Reporte de Cierre</h2>
             <div id="informe-detalle" class="space-y-3 text-lg">
                 <!-- Detalle inyectado -->
             </div>
             <button onclick="cerrarModalInforme()" class="mt-6 w-full bg-green-700 text-white p-4 rounded-xl font-bold">ENTENDIDO</button>
+        </div>
+    </div>
+
+    <!-- NUEVO: Modal de Alerta Personalizado -->
+    <div id="modal-alerta" class="fixed inset-0 bg-black bg-opacity-50 hidden z-[100] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-sm p-6 modal">
+            <div id="alerta-icono" class="text-center text-5xl mb-4">⚠️</div>
+            <h2 id="alerta-titulo" class="text-xl font-bold text-center mb-3"></h2>
+            <p id="alerta-mensaje" class="text-gray-700 text-center mb-6"></p>
+            <div class="flex gap-3">
+                <button id="alerta-btn-cancelar" onclick="cerrarModalAlerta()" class="flex-1 bg-gray-200 text-gray-800 p-3 rounded-lg font-bold hidden">
+                    Cancelar
+                </button>
+                <button id="alerta-btn-aceptar" onclick="confirmarAccionAlerta()" class="flex-1 bg-green-700 text-white p-3 rounded-lg font-bold">
+                    Aceptar
+                </button>
+            </div>
         </div>
     </div>
 
@@ -300,6 +342,57 @@
         };
         let selectedPrice = 7.5;
         let weeklyChartInstance = null;
+        
+        // Variables para el sistema de alertas personalizado
+        let alertaCallback = null;
+        let alertaEsConfirmacion = false;
+
+        // --- SISTEMA DE ALERTAS PERSONALIZADO ---
+        function mostrarAlerta(titulo, mensaje, icono = "✅") {
+            return new Promise((resolve) => {
+                document.getElementById('alerta-icono').innerText = icono;
+                document.getElementById('alerta-titulo').innerText = titulo;
+                document.getElementById('alerta-mensaje').innerText = mensaje;
+                document.getElementById('alerta-btn-cancelar').classList.add('hidden');
+                document.getElementById('modal-alerta').classList.remove('hidden');
+                
+                alertaCallback = () => {
+                    cerrarModalAlerta();
+                    resolve(true);
+                };
+            });
+        }
+
+        function mostrarConfirmacion(titulo, mensaje, icono = "⚠️") {
+            return new Promise((resolve) => {
+                document.getElementById('alerta-icono').innerText = icono;
+                document.getElementById('alerta-titulo').innerText = titulo;
+                document.getElementById('alerta-mensaje').innerText = mensaje;
+                document.getElementById('alerta-btn-cancelar').classList.remove('hidden');
+                document.getElementById('modal-alerta').classList.remove('hidden');
+                
+                alertaEsConfirmacion = true;
+                alertaCallback = (confirmado) => {
+                    cerrarModalAlerta();
+                    resolve(confirmado);
+                };
+            });
+        }
+
+        function confirmarAccionAlerta() {
+            if (alertaCallback) {
+                alertaCallback(true);
+            }
+        }
+
+        function cerrarModalAlerta() {
+            if (alertaEsConfirmacion && alertaCallback) {
+                alertaCallback(false);
+            }
+            document.getElementById('modal-alerta').classList.add('hidden');
+            alertaCallback = null;
+            alertaEsConfirmacion = false;
+        }
 
         function showSection(id) {
             document.querySelectorAll('.tab-content').forEach(s => s.classList.remove('active'));
@@ -357,6 +450,50 @@
             const calPrecio = (selectedProduct === 'maiz' && conCal) ? 3 : 0;
             const total = (cant * selectedPrice) + calPrecio;
             document.getElementById('live-total').innerText = `L ${total.toFixed(2)}`;
+            // Recalcular vuelto si ya hay un pago
+            if (document.getElementById('pago-cliente').value > 0) {
+                calcularVuelto();
+            }
+        }
+
+        // --- NUEVAS FUNCIONES PARA MANEJO DE PAGO ---
+        function quickPago(monto) {
+            const input = document.getElementById('pago-cliente');
+            input.value = monto;
+            calcularVuelto();
+        }
+
+        function calcularVuelto() {
+            const pago = parseFloat(document.getElementById('pago-cliente').value) || 0;
+            const total = parseFloat(document.getElementById('live-total').innerText.replace('L ', '')) || 0;
+            
+            if (pago > 0) {
+                let vuelto = pago - total;
+                // Redondear al múltiplo de 0.5 más cercano
+                if (vuelto > 0) {
+                    vuelto = Math.round(vuelto * 2) / 2;
+                }
+                
+                const container = document.getElementById('vuelto-container');
+                const vueltoElement = document.getElementById('vuelto-monto');
+                
+                if (vuelto > 0) {
+                    vueltoElement.innerText = `L ${vuelto.toFixed(2)}`;
+                    vueltoElement.className = "text-3xl font-black text-green-700";
+                    container.classList.remove('hidden');
+                } else if (vuelto === 0) {
+                    vueltoElement.innerText = "PAGO EXACTO";
+                    vueltoElement.className = "text-2xl font-black text-blue-600";
+                    container.classList.remove('hidden');
+                } else if (vuelto < 0) {
+                    const falta = Math.abs(vuelto);
+                    vueltoElement.innerText = `FALTAN L ${falta.toFixed(2)}`;
+                    vueltoElement.className = "text-2xl font-black text-red-600";
+                    container.classList.remove('hidden');
+                }
+            } else {
+                document.getElementById('vuelto-container').classList.add('hidden');
+            }
         }
 
         // --- MANEJO DE DATOS ---
@@ -366,7 +503,10 @@
             const libras = parseFloat(document.getElementById('inv-libras').value);
             const precio = parseFloat(document.getElementById('inv-precio').value);
 
-            if(!libras || !precio) return;
+            if(!libras || !precio) {
+                mostrarAlerta("Datos incompletos", "Por favor ingresa la cantidad de libras y el precio.", "⚠️");
+                return;
+            }
 
             const costoLibra = precio / libras;
             const saco = { 
@@ -380,24 +520,41 @@
 
             const tx = db.transaction("inventario", "readwrite");
             tx.objectStore("inventario").add(saco);
-            tx.oncomplete = () => {
-                actualizarTodo();
+            tx.oncomplete = async () => {
+                await actualizarTodo();
                 document.getElementById('inv-precio').value = '';
-                alert("Saco guardado.");
+                mostrarAlerta("Saco guardado", `Se ha agregado ${libras} lbs de ${tipo === 'maiz' ? 'maíz' : 'frijoles'} al inventario.`, "✅");
             };
         }
 
         async function registrarVenta() {
             const cant = parseFloat(document.getElementById('venta-cantidad').value);
             const conCal = document.getElementById('add-cal').checked;
+            const pagoCliente = parseFloat(document.getElementById('pago-cliente').value) || 0;
             
-            if (!cant || cant <= 0) return;
+            if (!cant || cant <= 0) {
+                mostrarAlerta("Cantidad inválida", "Por favor ingresa una cantidad válida.", "⚠️");
+                return;
+            }
+            
+            const total = parseFloat(document.getElementById('live-total').innerText.replace('L ', ''));
+            if (pagoCliente < total) {
+                mostrarAlerta("Pago insuficiente", 
+                    `El pago (L ${pagoCliente.toFixed(2)}) es menor que el total (L ${total.toFixed(2)}).\n\nFaltan L ${(total - pagoCliente).toFixed(2)}`, 
+                    "💰");
+                return;
+            }
 
             const inventario = await getAll("inventario");
             const sacosDisponibles = inventario.filter(s => s.tipo === selectedProduct && s.librasRestantes > 0);
             const totalLibre = sacosDisponibles.reduce((acc, s) => acc + s.librasRestantes, 0);
 
-            if(totalLibre < cant) return alert("No hay suficiente en inventario.");
+            if(totalLibre < cant) {
+                mostrarAlerta("Inventario insuficiente", 
+                    `No hay suficiente ${selectedProduct === 'maiz' ? 'maíz' : 'frijoles'} en inventario.\n\nDisponible: ${totalLibre.toFixed(1)} lbs\nSolicitado: ${cant.toFixed(1)} lbs`, 
+                    "📦");
+                return;
+            }
 
             let restantePorVender = cant;
             let costoTotalVenta = 0;
@@ -425,7 +582,6 @@
 
             const subtotal = cant * selectedPrice;
             const calPrecio = (selectedProduct === 'maiz' && conCal) ? 3 : 0;
-            const total = subtotal + calPrecio;
             const ganancia = total - costoTotalVenta;
 
             const venta = {
@@ -435,17 +591,34 @@
                 cal: calPrecio,
                 total: total,
                 ganancia: ganancia,
+                pagoRecibido: pagoCliente,
+                vuelto: pagoCliente - total,
                 fecha: new Date()
             };
 
             vtaStore.add(venta);
             histStore.add(venta);
-            tx.oncomplete = () => {
+            tx.oncomplete = async () => {
+                // Resetear formulario
                 document.getElementById('venta-cantidad').value = 1;
                 document.getElementById('add-cal').checked = false;
+                document.getElementById('pago-cliente').value = 0;
+                document.getElementById('vuelto-container').classList.add('hidden');
                 updateLiveTotal();
-                actualizarTodo();
-                alert("Venta registrada.");
+                await actualizarTodo();
+                
+                // Mostrar resumen de la venta con alerta personalizada
+                const icono = selectedProduct === 'maiz' ? '🌽' : '🥫';
+                const productoNombre = selectedProduct === 'maiz' ? 'Maíz' : 'Frijoles';
+                
+                await mostrarAlerta(
+                    "Venta registrada exitosamente",
+                    `${icono} ${productoNombre}: ${cant.toFixed(1)} lbs\n` +
+                    `💰 Total: L ${total.toFixed(2)}\n` +
+                    `💵 Pago: L ${pagoCliente.toFixed(2)}\n` +
+                    `🔄 Vuelto: L ${(pagoCliente - total).toFixed(2)}`,
+                    "✅"
+                );
             };
         }
 
@@ -458,23 +631,40 @@
                 pagado: false,
                 fecha: new Date()
             };
-            if(!fiado.deuda) return;
+            
+            if(!fiado.deuda) {
+                mostrarAlerta("Deuda no especificada", "Por favor ingresa el monto que se debe.", "💰");
+                return;
+            }
+            
             const tx = db.transaction("fiados", "readwrite");
             tx.objectStore("fiados").add(fiado);
-            tx.oncomplete = () => {
-                actualizarTodo();
+            tx.oncomplete = async () => {
+                await actualizarTodo();
                 document.getElementById('fia-deuda').value = '';
-                alert("Deuda registrada.");
+                const icono = fiado.tipo === 'maiz' ? '🌽' : '🥫';
+                mostrarAlerta("Deuda registrada", `Se ha registrado un fiado de ${icono} por L ${fiado.deuda.toFixed(2)}`, "📝");
             };
         }
 
         async function pagarFiado(id) {
+            const confirmado = await mostrarConfirmacion(
+                "Marcar como pagado",
+                "¿Estás seguro de marcar este fiado como pagado?",
+                "✅"
+            );
+            
+            if (!confirmado) return;
+            
             const tx = db.transaction("fiados", "readwrite");
             const store = tx.objectStore("fiados");
             const f = await new Promise(res => { store.get(id).onsuccess = e => res(e.target.result); });
             f.pagado = true;
             store.put(f);
-            tx.oncomplete = () => actualizarTodo();
+            tx.oncomplete = async () => {
+                await actualizarTodo();
+                mostrarAlerta("Fiado pagado", "El fiado ha sido marcado como pagado exitosamente.", "💰");
+            };
         }
 
         // --- ESTADÍSTICAS SEMANALES ---
@@ -638,10 +828,20 @@
 
         async function cerrarJornadaManual() {
             const ventas = await getAll("ventas");
-            if(ventas.length === 0) return alert("No hay ventas hoy.");
-            if(confirm("¿Cerrar el día y generar reporte?")) {
-                await ejecutarCierre();
+            if(ventas.length === 0) {
+                mostrarAlerta("No hay ventas hoy", "No se puede cerrar la jornada porque no hay ventas registradas hoy.", "📊");
+                return;
             }
+            
+            const confirmado = await mostrarConfirmacion(
+                "Cerrar jornada",
+                "¿Estás seguro de cerrar la jornada y generar el reporte diario?",
+                "📊"
+            );
+            
+            if (!confirmado) return;
+            
+            await ejecutarCierre();
         }
 
         // FUNCIÓN CORREGIDA: ejecutarCierre
@@ -652,7 +852,7 @@
                 
                 if (ventas.length === 0) return;
 
-                let mLib = 0, fLib = 0, calTotal = 0, recaudado = 0, gananciaTotal = 0;
+                let mLib = 0, fLib = 0, calTotal = 0, recaudado = 0, gananciaTotal = 0, pagoTotal = 0, vueltoTotal = 0;
                 
                 ventas.forEach(v => {
                     if (v.producto === 'maiz') mLib += v.cantidad;
@@ -660,6 +860,8 @@
                     calTotal += (v.cal || 0);
                     recaudado += (v.total || 0);
                     gananciaTotal += (v.ganancia || 0);
+                    pagoTotal += (v.pagoRecibido || 0);
+                    vueltoTotal += (v.vuelto || 0);
                 });
 
                 const jornada = {
@@ -668,7 +870,9 @@
                     frijol: fLib,
                     cal: calTotal,
                     total: recaudado,
-                    ganancia: gananciaTotal
+                    ganancia: gananciaTotal,
+                    pagoRecibido: pagoTotal,
+                    vuelto: vueltoTotal
                 };
 
                 // 2. Guardar jornada y limpiar ventas en una sola transacción segura
@@ -705,16 +909,18 @@
 
             } catch (error) {
                 console.error("Error en el cierre de jornada:", error);
-                alert("Ocurrió un error al procesar el cierre.");
+                mostrarAlerta("Error en el cierre", "Ocurrió un error al procesar el cierre de jornada.", "❌");
             }
         }
 
         function mostrarReporteModal(j) {
             const html = `
                 <div class="flex justify-between border-b pb-2"><span>Maíz:</span> <b>${j.maiz.toFixed(1)} lbs</b></div>
-                <div class="flex justify-between border-b pb-2"><span>Frijol:</span> <b>${j.frijol.toFixed(1)} lbs</b></div>
+                <div class="flex justify-between border-b pb-2"><span>Frijoles:</span> <b>${j.frijol.toFixed(1)} lbs</b></div>
                 <div class="flex justify-between border-b pb-2"><span>Cal:</span> <b>L ${j.cal.toFixed(2)}</b></div>
                 <div class="flex justify-between border-b pb-2 text-green-700 font-bold"><span>Total Cobrado:</span> <span>L ${j.total.toFixed(2)}</span></div>
+                <div class="flex justify-between border-b pb-2"><span>Pago Recibido:</span> <span>L ${j.pagoRecibido.toFixed(2)}</span></div>
+                <div class="flex justify-between border-b pb-2 text-blue-600"><span>Vuelto Entregado:</span> <span>L ${j.vuelto.toFixed(2)}</span></div>
                 <div class="flex justify-between text-blue-700 font-bold"><span>Ganancia:</span> <span>L ${j.ganancia.toFixed(2)}</span></div>
             `;
             document.getElementById('informe-detalle').innerHTML = html;
@@ -749,7 +955,8 @@
                 if (s.librasRestantes <= 0) return;
                 const div = document.createElement('div');
                 div.className = "flex justify-between p-2 border-b text-sm bg-white rounded-lg mb-1";
-                div.innerHTML = `<span>Saco ${s.libras} lbs</span> <b>${s.librasRestantes.toFixed(1)} rest.</b>`;
+                const icono = s.tipo === 'maiz' ? '🌽' : '🥫';
+                div.innerHTML = `<span>${icono} Saco ${s.libras} lbs</span> <b>${s.librasRestantes.toFixed(1)} rest.</b>`;
                 if(s.tipo === 'maiz') lMaiz.appendChild(div); else lFrijol.appendChild(div);
             });
 
@@ -759,12 +966,13 @@
             fiados.reverse().forEach(f => {
                 const card = document.createElement('div');
                 card.className = `card ${f.pagado ? 'opacity-50' : 'border-l-4 border-yellow-500'}`;
+                const icono = f.tipo === 'maiz' ? '🌽' : '🥫';
                 card.innerHTML = `
                     <div class="flex justify-between">
-                        <b>${f.tipo === 'maiz' ? '🌽 Maíz' : '🫘 Frijol'}</b>
+                        <b>${icono} ${f.tipo === 'maiz' ? 'Maíz' : 'Frijoles'}</b>
                         <span class="${f.pagado ? 'text-green-600' : 'text-red-600'} font-bold">${f.pagado ? 'PAGADO' : 'PENDIENTE'}</span>
                     </div>
-                    <p class="text-sm">Sacos: ${f.cantidadSacos} | Deuda: L ${f.deuda}</p>
+                    <p class="text-sm">Sacos: ${f.cantidadSacos} | Deuda: L ${f.deuda.toFixed(2)}</p>
                     ${!f.pagado ? `<button onclick="pagarFiado(${f.id})" class="mt-2 w-full py-2 bg-yellow-100 rounded font-bold">MARCAR PAGADO</button>` : ''}
                 `;
                 fCont.appendChild(card);
@@ -787,7 +995,7 @@
                     </div>
                     <div class="grid grid-cols-2 gap-1 text-gray-600">
                         <div>🌽 ${j.maiz.toFixed(1)} lbs</div>
-                        <div>🫘 ${j.frijol.toFixed(1)} lbs</div>
+                        <div>🥫 ${j.frijol.toFixed(1)} lbs</div>
                         <div>Cal: L ${j.cal.toFixed(2)}</div>
                         <div class="text-blue-700">Gan: L ${j.ganancia.toFixed(2)}</div>
                     </div>
@@ -800,6 +1008,4 @@
         selectProduct('maiz');
     </script>
 </body>
-
 </html>
-
